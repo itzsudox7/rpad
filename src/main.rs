@@ -1,6 +1,13 @@
-use std::fmt::format;
-
 use eframe::egui;
+use rfd::FileDialog;
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Default)]
+struct MyApp {
+    text: String,
+    current_file: Option<PathBuf>,
+}
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions::default();
@@ -12,11 +19,6 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
-#[derive(Default)]
-struct MyApp {
-    text: String,
-}
-
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // topbar
@@ -24,14 +26,27 @@ impl eframe::App for MyApp {
             ui.horizontal(|ui| {
                 if ui.button("New").clicked() {
                     self.text.clear();
+                    self.current_file = None;
                 }
 
                 if ui.button("Open").clicked() {
-                    println!("Open clicked");
+                    if let Some(path) = FileDialog::new().pick_file() {
+                        if let Ok(content) = fs::read_to_string(&path) {
+                            self.text = content;
+                            self.current_file = Some(path);
+                        }
+                    }
                 }
 
                 if ui.button("Save").clicked() {
-                    println!("Save clicked");
+                    if let Some(path) = &self.current_file {
+                        let _ = fs::write(path, &self.text);
+                    } else {
+                        if let Some(path) = FileDialog::new().save_file() {
+                            let _ = fs::write(&path, &self.text);
+                            self.current_file = Some(path);
+                        }
+                    }
                 }
             });
         });
