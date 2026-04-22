@@ -23,6 +23,7 @@ impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // topbar
         egui::Panel::top("menu").show_inside(ui, |ui| {
+            ui.add_space(4.0);
             ui.horizontal(|ui| {
                 if ui.button("New").clicked() {
                     self.text.clear();
@@ -48,7 +49,20 @@ impl eframe::App for MyApp {
                         }
                     }
                 }
+
+                ui.separator();
+
+                // show current file
+                let name = self
+                    .current_file
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or("Untitled".to_string());
+
+                ui.label(format!("{}", name));
             });
+
+            ui.add_space(4.0);
         });
 
         // status bar
@@ -58,7 +72,8 @@ impl eframe::App for MyApp {
 
         // editor
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.add(
+            ui.add_sized(
+                ui.available_size(),
                 egui::TextEdit::multiline(&mut self.text)
                     .desired_rows(25)
                     .lock_focus(true),
