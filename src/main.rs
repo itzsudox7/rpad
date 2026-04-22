@@ -21,6 +21,8 @@ fn main() -> Result<(), eframe::Error> {
 
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        ui.ctx().set_visuals(egui::Visuals::dark());
+
         // topbar
         egui::Panel::top("menu").show_inside(ui, |ui| {
             ui.add_space(4.0);
@@ -67,11 +69,19 @@ impl eframe::App for MyApp {
 
         // status bar
         egui::Panel::bottom("status").show_inside(ui, |ui| {
-            ui.label(format!("Length: {}", self.text.len()));
+            ui.horizontal(|ui| {
+                ui.label(format!("Length: {}", self.text.len()));
+
+                ui.separator();
+
+                ui.label(format!("Lines: {}", self.text.lines().count()));
+            });
         });
 
         // editor
         egui::CentralPanel::default().show_inside(ui, |ui| {
+            ui.add_space(8.0);
+
             ui.add_sized(
                 ui.available_size(),
                 egui::TextEdit::multiline(&mut self.text)
