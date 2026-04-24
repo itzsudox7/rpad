@@ -1,16 +1,57 @@
-use eframe::egui;
-use rfd::FileDialog;
-use std::fs;
-use std::path::PathBuf;
+// rpad - a notepad written in rust and egui
+mod file;
+mod search;
+mod settings;
+mod shortcuts;
+mod theme;
+mod ui;
 
-#[derive(Default)]
-struct MyApp {
-    text: String,
-    current_file: Option<PathBuf>,
+use eframe::egui;
+use file::FileState;
+use search::SearchState;
+use settings::Settings;
+use theme::Theme;
+
+pub struct MyApp {
+    file: FileState,
+    settings: Settings,
+    theme: Theme,
+    search: SearchState,
+    show_search: bool,
+    show_minimap: bool,
+    cursor_line: usize,
+    cursor_col: usize,
+    font_size: f32,
+    tab_size: usize,
 }
 
+// creates the app with default settings
+impl Default for MyApp {
+    fn default() -> Self {
+        Self {
+            file: FileState::default(),
+            settings: Settings::default(),
+            theme: Theme::Dark,
+            search: SearchState::default(),
+            show_search: false,
+            show_minimap: false,
+            cursor_line: 1,
+            cursor_col: 1,
+            font_size: 14.0,
+            tab_size: 4,
+        }
+    }
+}
+
+// starts the editor window
 fn main() -> Result<(), eframe::Error> {
-    let options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1100.0, 700.0])
+            .with_min_inner_size([600.0, 400.0])
+            .with_title("Rpad"),
+        ..Default::default()
+    };
 
     eframe::run_native(
         "Rpad",
@@ -19,75 +60,50 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
+// draws the editor ui
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        ui.ctx().set_visuals(egui::Visuals::dark());
+        self.file.dirty = self.file.is_dirty();
 
-        // topbar
-        egui::Panel::top("menu").show_inside(ui, |ui| {
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                if ui.button("New").clicked() {
-                    self.text.clear();
-                    self.current_file = None;
-                }
+        ui::UiState::apply_theme(ui.ctx(), self.theme, self.font_size);
+        shortcuts::Shortcuts::handle(ui, &mut self.file, &mut self.show_search, &mut self.font_size);
 
-                if ui.button("Open").clicked() {
-                    if let Some(path) = FileDialog::new().pick_file() {
-                        if let Ok(content) = fs::read_to_string(&path) {
-                            self.text = content;
-                            self.current_file = Some(path);
-                        }
-                    }
-                }
+        ui::UiState::topbar(
+            ui,
+            &mut self.file,
+            &mut self.theme,
+            &mut self.settings,
+            &mut self.show_search,
+            &mut self.show_minimap,
+        );
 
-                if ui.button("Save").clicked() {
-                    if let Some(path) = &self.current_file {
-                        let _ = fs::write(path, &self.text);
-                    } else {
-                        if let Some(path) = FileDialog::new().save_file() {
-                            let _ = fs::write(&path, &self.text);
-                            self.current_file = Some(path);
-                        }
-                    }
-                }
+        ui::UiState::statusbar(
+            ui,
+            self.theme,
+            &self.file.text,
+            self.cursor_line,
+            self.cursor_col,
+            self.tab_size,
+        );
 
-                ui.separator();
-
-                // show current file
-                let name = self
-                    .current_file
-                    .as_ref()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or("Untitled".to_string());
-
-                ui.label(format!("{}", name));
-            });
-
-            ui.add_space(4.0);
-        });
-
-        // status bar
-        egui::Panel::bottom("status").show_inside(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(format!("Length: {}", self.text.len()));
-
-                ui.separator();
-
-                ui.label(format!("Lines: {}", self.text.lines().count()));
-            });
-        });
-
-        // editor
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.add_space(8.0);
-
-            ui.add_sized(
-                ui.available_size(),
-                egui::TextEdit::multiline(&mut self.text)
-                    .desired_rows(25)
-                    .lock_focus(true),
+        if self.show_search {
+            ui::UiState::searchbar(
+                ui,
+                self.theme,
+                &mut self.search,
+                &mut self.file.text,
+                &mut self.show_search,
             );
-        });
+        }
+
+        ui::UiState::editor(
+            ui,
+            self.theme,
+            &self.settings,
+            &mut self.file.text,
+            self.show_minimap,
+            self.font_size,
+            &mut (self.cursor_line, self.cursor_col),
+        );
     }
 }
